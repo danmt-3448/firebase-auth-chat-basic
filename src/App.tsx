@@ -24,7 +24,8 @@ function App() {
   const [roomSelectedId, setRoomSelectedId] = useState<string>('')
   const inputRef = useRef<any>(null)
   const [inputValue, setInputValue] = useState('')
-
+  const roomRef = collection(firestore, 'rooms')
+  const messagesRef = collection(firestore, 'messages')
   const handleInputOnchange = (evt: any) => {
     setInputValue(evt.target.value)
   }
@@ -44,9 +45,7 @@ function App() {
     try {
       const result = await signInWithPopup(auth, googleProvider)
       const user = result.user
-
       const infor = await getAdditionalUserInfo(result)
-
       // Get the current server timestamp
       const timestamp = serverTimestamp()
       if (!infor?.isNewUser) {
@@ -79,13 +78,14 @@ function App() {
   const getListRooms = async () => {
     const q = query(collection(firestore, 'rooms'))
     onSnapshot(q, (querySnapshot) => {
-      const docs: any[] = querySnapshot.docs.map((doc) => doc.data())
+      const docs: any[] = querySnapshot.docs
+        .map((doc) => doc.data())
+        .filter((doc) => doc.id.includes(userInfor.email))
       setListRooms(docs)
     })
   }
 
   const createRoomChat = async (user: any) => {
-    const roomRef = collection(firestore, 'rooms')
     const q = query(
       roomRef,
       or(
@@ -97,7 +97,7 @@ function App() {
     if (isNewRoom) {
       try {
         const id = userInfor.email + '-' + user.email
-        await addDoc(collection(firestore, 'rooms'), {
+        await addDoc(roomRef, {
           id,
           member: [
             {email: user.email, uid: user.uid},
@@ -115,20 +115,16 @@ function App() {
   }
 
   const selectRoomChat = async (room: any) => {
-    const q = query(
-      collection(firestore, 'messages'),
-      where('roomId', '==', room.id),
-    )
+    const q = query(messagesRef, where('roomId', '==', room.id))
     onSnapshot(q, (querySnapshot) => {
       const docs: any[] = querySnapshot.docs.map((doc) => doc.data())
       setListMessages(docs)
     })
-
     setRoomSelectedId(room.id)
   }
 
   const handleOnSubmit = () => {
-    addDoc(collection(firestore, 'messages'), {
+    addDoc(messagesRef, {
       uid: userInfor?.uid,
       email: userInfor?.email,
       text: inputValue,
