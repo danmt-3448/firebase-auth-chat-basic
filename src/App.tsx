@@ -6,6 +6,7 @@ import {
   collection,
   getDocs,
   onSnapshot,
+  or,
   query,
   serverTimestamp,
   where,
@@ -76,27 +77,40 @@ function App() {
   }
 
   const getListRooms = async () => {
-    const querySnapshot =
-      (await (
-        await getDocs(collection(firestore, 'rooms'))
-      ).docs.map((doc) => doc.data())) || []
-    setListRooms(querySnapshot)
+    const q = query(collection(firestore, 'rooms'))
+    onSnapshot(q, (querySnapshot) => {
+      const docs: any[] = querySnapshot.docs.map((doc) => doc.data())
+      setListRooms(docs)
+    })
   }
 
   const createRoomChat = async (user: any) => {
-    try {
-      const id = Date.now() + '-' + userInfor.email + '-' + user.email
-      await addDoc(collection(firestore, 'rooms'), {
-        id,
-        member: [
-          {email: user.email, uid: user.uid},
-          {email: userInfor.email, uid: userInfor.uid},
-        ],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
-    } catch (error) {
-      console.log(error)
+    const roomRef = collection(firestore, 'rooms')
+    const q = query(
+      roomRef,
+      or(
+        where('id', '==', user.email + '-' + userInfor.email),
+        where('id', '==', userInfor.email + '-' + user.email),
+      ),
+    )
+    const isNewRoom = await (await getDocs(q)).empty
+    if (isNewRoom) {
+      try {
+        const id = userInfor.email + '-' + user.email
+        await addDoc(collection(firestore, 'rooms'), {
+          id,
+          member: [
+            {email: user.email, uid: user.uid},
+            {email: userInfor.email, uid: userInfor.uid},
+          ],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      } catch (error) {
+        console.log(error)
+      }
+    } else {
+      alert('Đã tạo phòng r')
     }
   }
 
