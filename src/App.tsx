@@ -1,20 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {Button, Form, Input} from 'antd'
-import {getAdditionalUserInfo, signInWithPopup} from 'firebase/auth'
+import { Button, Form, Input } from 'antd'
+import { getAdditionalUserInfo, signInWithPopup } from 'firebase/auth'
 import {
   addDoc,
   collection,
   getDocs,
   onSnapshot,
   or,
+  orderBy,
   query,
   serverTimestamp,
   where,
 } from 'firebase/firestore'
-import {useEffect, useRef, useState} from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
-import {auth, firestore} from './config/firebase'
-import {googleProvider} from './context'
+import { auth, firestore } from './config/firebase'
+import { googleProvider } from './context'
 
 function App() {
   const [userInfor, setUserInfor] = useState<any>()
@@ -100,8 +101,8 @@ function App() {
         await addDoc(roomRef, {
           id,
           member: [
-            {email: user.email, uid: user.uid},
-            {email: userInfor.email, uid: userInfor.uid},
+            { email: user.email, uid: user.uid },
+            { email: userInfor.email, uid: userInfor.uid },
           ],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -115,7 +116,7 @@ function App() {
   }
 
   const selectRoomChat = async (room: any) => {
-    const q = query(messagesRef, where('roomId', '==', room.id))
+    const q = query(messagesRef, where('roomId', '==', room.id), orderBy('createdAt'))
     onSnapshot(q, (querySnapshot) => {
       const docs: any[] = querySnapshot.docs.map((doc) => doc.data())
       setListMessages(docs)
@@ -129,6 +130,8 @@ function App() {
       email: userInfor?.email,
       text: inputValue,
       roomId: roomSelectedId,
+      id: Date.now() + '-' + userInfor.uid,
+      createdAt: serverTimestamp()
     })
     form.resetFields(['message'])
 
@@ -140,6 +143,17 @@ function App() {
     return clearTimeout(timeout)
   }
 
+  const sendAllMessage = async () => {
+    listRooms.map(async room => await addDoc(messagesRef, {
+      uid: userInfor?.uid,
+      email: userInfor?.email,
+      text: 'message send all',
+      roomId: room.id,
+      id: Date.now() + '-' + userInfor.uid,
+      createdAt: serverTimestamp()
+    }))
+  }
+
   useEffect(() => {
     const user = localStorage.getItem('user') as string
     setUserInfor(JSON.parse(user))
@@ -148,7 +162,7 @@ function App() {
   return (
     <>
       {userInfor ? (
-        <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div>
             my email:
             {userInfor?.email}
@@ -161,7 +175,7 @@ function App() {
               {listUsers.map((user) => (
                 <div
                   key={user.uid}
-                  style={{display: 'flex', gap: 10, alignItems: 'center'}}
+                  style={{ display: 'flex', gap: 10, alignItems: 'center' }}
                 >
                   <div>user email: {user.email}</div>{' '}
                   <button key={user.uid} onClick={() => createRoomChat(user)}>
@@ -178,7 +192,7 @@ function App() {
               {listRooms.map((room) => (
                 <div
                   key={room.id}
-                  style={{display: 'flex', gap: 10, alignItems: 'center'}}
+                  style={{ display: 'flex', gap: 10, alignItems: 'center' }}
                 >
                   <div>id room: {room.id}</div>
                   <button key={room.id} onClick={() => selectRoomChat(room)}>
@@ -186,6 +200,10 @@ function App() {
                   </button>
                 </div>
               ))}
+
+              <Button onClick={sendAllMessage}>
+                Send all message
+              </Button>
             </>
           )}
 
@@ -204,7 +222,7 @@ function App() {
                 <div className="chat-window">
                   {listMessages.map((mess: any) => (
                     <div
-                      key={mess.uid}
+                      key={mess.id}
                       style={{
                         display: 'flex',
                         gap: 20,
@@ -238,6 +256,10 @@ function App() {
               </Form>
             </div>
           )}
+
+
+
+
         </div>
       ) : (
         <button onClick={handleGoogleSignIn}>login with google</button>
